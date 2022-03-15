@@ -143,11 +143,13 @@ func resourceStripeCouponCreate(ctx context.Context, d *schema.ResourceData, m i
 	if maxRedemptions, set := d.GetOk("max_redemptions"); set {
 		params.MaxRedemptions = stripe.Int64(ToInt64(maxRedemptions))
 	}
-	if redeemBy, set := d.GetOk("redeem_by"); set {
-		redeemByTime, err := time.Parse(time.RFC3339, ToString(redeemBy))
+	if redeemByStr, set := d.GetOk("redeem_by"); set {
+		redeemByTime, err := time.Parse(time.RFC3339, redeemByStr.(string))
+
 		if err != nil {
-			return diag.Errorf("can't convert time \"%s\" to time.  Please check if it's RFC3339-compliant", redeemByTime)
+			return diag.Errorf("can't convert time \"%s\" to time.  Please check if it's RFC3339-compliant", redeemByStr)
 		}
+
 		params.RedeemBy = stripe.Int64(redeemByTime.Unix())
 	}
 	if appliesTo, set := d.GetOk("applies_to"); set {
@@ -187,6 +189,11 @@ func resourceStripeCouponRead(_ context.Context, d *schema.ResourceData, m inter
 		appliesTo = coupon.AppliesTo.Products
 	}
 
+	var RedeemByStr string
+	if coupon.RedeemBy != 0 {
+		RedeemByStr = time.Unix(coupon.RedeemBy, 0).Format(time.RFC3339)
+	}
+
 	return CallSet(
 		d.Set("name", coupon.Name),
 		d.Set("amount_off", coupon.AmountOff),
@@ -195,7 +202,7 @@ func resourceStripeCouponRead(_ context.Context, d *schema.ResourceData, m inter
 		d.Set("duration", coupon.Duration),
 		d.Set("duration_in_months", coupon.DurationInMonths),
 		d.Set("max_redemptions", coupon.MaxRedemptions),
-		d.Set("redeem_by", coupon.RedeemBy),
+		d.Set("redeem_by", RedeemByStr),
 		d.Set("times_redeemed", coupon.TimesRedeemed),
 		d.Set("applies_to", appliesTo),
 		d.Set("metadata", coupon.Metadata),
