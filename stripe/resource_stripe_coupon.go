@@ -179,7 +179,10 @@ func resourceStripeCouponCreate(ctx context.Context, d *schema.ResourceData, m i
 func resourceStripeCouponRead(_ context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*client.API)
 
-	coupon, err := c.Coupons.Get(d.Id(), nil)
+	params := &stripe.CouponParams{}
+	params.AddExpand("applies_to")
+
+	coupon, err := c.Coupons.Get(d.Id(), params)
 	if err != nil {
 		return diag.FromErr(err)
 	}
