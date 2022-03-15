@@ -2,6 +2,7 @@ package stripe
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -39,6 +40,7 @@ func resourceStripeCoupon() *schema.Resource {
 				Type:     schema.TypeString,
 				Optional: true,
 				ForceNew: true,
+				Default:  nil,
 				Description: "If amount_off has been set, " +
 					"the three-letter ISO code for the currency of the amount to take off.",
 			},
@@ -70,6 +72,7 @@ func resourceStripeCoupon() *schema.Resource {
 				Type:     schema.TypeInt,
 				Optional: true,
 				ForceNew: true,
+				Default:  nil,
 				Description: "Maximum number of times this coupon can be redeemed, " +
 					"in total, across all customers, before it is no longer valid.",
 			},
@@ -111,6 +114,7 @@ func resourceStripeCoupon() *schema.Resource {
 func resourceStripeCouponCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*client.API)
 	params := &stripe.CouponParams{}
+	couponDuration := d.Get("duration").(string)
 
 	if name, set := d.GetOk("name"); set {
 		params.Name = stripe.String(ToString(name))
@@ -119,7 +123,10 @@ func resourceStripeCouponCreate(ctx context.Context, d *schema.ResourceData, m i
 		params.AmountOff = stripe.Int64(ToInt64(amountOff))
 	}
 	if currency, set := d.GetOk("currency"); set {
-		params.Currency = stripe.String(ToString(currency))
+		if &params.AmountOff == nil {
+			return diag.Errorf("can't set currency when using percent off")
+		}
+		params.Currency = stripe.String(currency.(string))
 	}
 	if percentOff, set := d.GetOk("percent_off"); set {
 		params.PercentOff = stripe.Float64(ToFloat64(percentOff))
@@ -128,17 +135,20 @@ func resourceStripeCouponCreate(ctx context.Context, d *schema.ResourceData, m i
 		params.Duration = stripe.String(ToString(duration))
 	}
 	if durationInMonths, set := d.GetOk("duration_in_months"); set {
+		if couponDuration != "repeating" {
+			return diag.Errorf("can't set duration in months if event is not repeating")
+		}
 		params.DurationInMonths = stripe.Int64(ToInt64(durationInMonths))
 	}
 	if maxRedemptions, set := d.GetOk("max_redemptions"); set {
 		params.MaxRedemptions = stripe.Int64(ToInt64(maxRedemptions))
 	}
 	if redeemBy, set := d.GetOk("redeem_by"); set {
-		t, err := time.Parse(time.RFC3339, ToString(redeemBy))
+		redeemByTime, err := time.Parse(time.RFC3339, ToString(redeemBy))
 		if err != nil {
-			return diag.FromErr(err)
+			return diag.Errorf("can't convert time \"%s\" to time.  Please check if it's RFC3339-compliant", redeemByTime)
 		}
-		params.RedeemBy = stripe.Int64(t.Unix())
+		params.RedeemBy = stripe.Int64(redeemByTime.Unix())
 	}
 	if appliesTo, set := d.GetOk("applies_to"); set {
 		params.AppliesTo = &stripe.CouponAppliesToParams{
@@ -156,7 +166,11 @@ func resourceStripeCouponCreate(ctx context.Context, d *schema.ResourceData, m i
 		return diag.FromErr(err)
 	}
 
+	log.Printf("[INFO] Create coupon: %s (%s)", coupon.Name, coupon.ID)
 	d.SetId(coupon.ID)
+	d.Set("valid", coupon.Valid)
+	d.Set("times_redeemed", coupon.TimesRedeemed)
+
 	return resourceStripeCouponRead(ctx, d, m)
 }
 
@@ -181,7 +195,7 @@ func resourceStripeCouponRead(_ context.Context, d *schema.ResourceData, m inter
 		d.Set("duration", coupon.Duration),
 		d.Set("duration_in_months", coupon.DurationInMonths),
 		d.Set("max_redemptions", coupon.MaxRedemptions),
-		d.Set("redeem_by", time.Unix(coupon.RedeemBy, 0).Format(time.RFC3339)),
+		d.Set("redeem_by", coupon.RedeemBy),
 		d.Set("times_redeemed", coupon.TimesRedeemed),
 		d.Set("applies_to", appliesTo),
 		d.Set("metadata", coupon.Metadata),
