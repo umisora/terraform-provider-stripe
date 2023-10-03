@@ -162,8 +162,12 @@ func resourceStripeCouponCreate(ctx context.Context, d *schema.ResourceData, m i
 			params.AddMetadata(k, ToString(v))
 		}
 	}
-
-	coupon, err := c.Coupons.New(params)
+	var coupon *stripe.Coupon
+	err := withRateLimiting(func() error {
+		var errLocal error
+		coupon, errLocal = c.Coupons.New(params)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -182,7 +186,12 @@ func resourceStripeCouponRead(_ context.Context, d *schema.ResourceData, m inter
 	params := &stripe.CouponParams{}
 	params.AddExpand("applies_to")
 
-	coupon, err := c.Coupons.Get(d.Id(), params)
+	var coupon *stripe.Coupon
+	err := withRateLimiting(func() error {
+		var errLocal error
+		coupon, errLocal = c.Coupons.Get(d.Id(), params)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -228,7 +237,10 @@ func resourceStripeCouponUpdate(ctx context.Context, d *schema.ResourceData, m i
 		}
 	}
 
-	_, err := c.Coupons.Update(d.Id(), params)
+	err := withRateLimiting(func() error {
+		_, errLocal := c.Coupons.Update(d.Id(), params)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -239,7 +251,10 @@ func resourceStripeCouponUpdate(ctx context.Context, d *schema.ResourceData, m i
 func resourceStripeCouponDelete(_ context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*client.API)
 
-	_, err := c.Coupons.Del(d.Id(), nil)
+	err := withRateLimiting(func() error {
+		_, errLocal := c.Coupons.Del(d.Id(), nil)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}

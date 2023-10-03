@@ -227,7 +227,12 @@ func resourceStripePrice() *schema.Resource {
 
 func resourceStripePriceRead(_ context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*client.API)
-	price, err := c.Prices.Get(d.Id(), nil)
+	var price *stripe.Price
+	err := withRateLimiting(func() error {
+		var errLocal error
+		price, errLocal = c.Prices.Get(d.Id(), nil)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -405,7 +410,12 @@ func resourceStripePriceCreate(ctx context.Context, d *schema.ResourceData, m in
 		}
 	}
 
-	price, err := c.Prices.New(params)
+	var price *stripe.Price
+	err := withRateLimiting(func() error {
+		var errLocal error
+		price, errLocal = c.Prices.New(params)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -451,7 +461,10 @@ func resourceStripePriceUpdate(ctx context.Context, d *schema.ResourceData, m in
 		}
 	}
 
-	_, err := c.Prices.Update(d.Id(), params)
+	err := withRateLimiting(func() error {
+		_, errLocal := c.Prices.Update(d.Id(), params)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}

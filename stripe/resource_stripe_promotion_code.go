@@ -146,8 +146,12 @@ func resourceStripePromotionCodeCreate(ctx context.Context, d *schema.ResourceDa
 			params.AddMetadata(k, ToString(v))
 		}
 	}
-
-	promotionCode, err := c.PromotionCodes.New(params)
+	var promotionCode *stripe.PromotionCode
+	err := withRateLimiting(func() error {
+		var errLocal error
+		promotionCode, errLocal = c.PromotionCodes.New(params)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -158,7 +162,13 @@ func resourceStripePromotionCodeCreate(ctx context.Context, d *schema.ResourceDa
 
 func resourceStripePromotionCodeRead(_ context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*client.API)
-	promotionCode, err := c.PromotionCodes.Get(d.Id(), nil)
+
+	var promotionCode *stripe.PromotionCode
+	err := withRateLimiting(func() error {
+		var errLocal error
+		promotionCode, errLocal = c.PromotionCodes.Get(d.Id(), nil)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -209,7 +219,12 @@ func resourceStripePromotionCodeUpdate(ctx context.Context, d *schema.ResourceDa
 			params.AddMetadata(k, ToString(v))
 		}
 	}
-	_, err := c.PromotionCodes.Update(d.Id(), params)
+
+	err := withRateLimiting(func() error {
+		var errLocal error
+		_, errLocal = c.PromotionCodes.Update(d.Id(), params)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}

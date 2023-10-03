@@ -124,7 +124,12 @@ func resourceStripeCustomer() *schema.Resource {
 func resourceStripeCustomerRead(_ context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*client.API)
 
-	customer, err := c.Customers.Get(d.Id(), nil)
+	var customer *stripe.Customer
+	err := withRateLimiting(func() error {
+		var errLocal error
+		customer, errLocal = c.Customers.Get(d.Id(), nil)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -320,7 +325,12 @@ func resourceStripeCustomerCreate(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
-	customer, err := c.Customers.New(params)
+	var customer *stripe.Customer
+	err := withRateLimiting(func() error {
+		var errLocal error
+		customer, errLocal = c.Customers.New(params)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -432,7 +442,11 @@ func resourceStripeCustomerUpdate(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
-	_, err := c.Customers.Update(d.Id(), params)
+	err := withRateLimiting(func() error {
+		var errLocal error
+		_, errLocal = c.Customers.Update(d.Id(), params)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -444,7 +458,11 @@ func resourceStripeCustomerUpdate(ctx context.Context, d *schema.ResourceData, m
 func resourceStripeCustomerDelete(_ context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*client.API)
 
-	_, err := c.Customers.Del(d.Id(), nil)
+	err := withRateLimiting(func() error {
+		var errLocal error
+		_, errLocal = c.Customers.Del(d.Id(), nil)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
