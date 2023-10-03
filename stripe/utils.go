@@ -1,8 +1,11 @@
 package stripe
 
 import (
+	"context"
+
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"golang.org/x/sync/semaphore"
 )
 
 func ExtractString(d *schema.ResourceData, key string) string {
@@ -145,4 +148,16 @@ func CallSet(err ...error) (d diag.Diagnostics) {
 		}
 	}
 	return d
+}
+
+const maxOperations = 10
+
+var limiter = semaphore.NewWeighted(maxOperations)
+
+func withRateLimiting(f func() error) error {
+	if err := limiter.Acquire(context.Background(), 1); err != nil {
+		return err
+	}
+	defer limiter.Release(1)
+	return f()
 }

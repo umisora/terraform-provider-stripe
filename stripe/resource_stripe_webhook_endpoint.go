@@ -64,7 +64,12 @@ func resourceStripeWebhookEndpoint() *schema.Resource {
 func resourceStripeWebhookEndpointRead(_ context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*client.API)
 
-	webhookEndpoint, err := c.WebhookEndpoints.Get(d.Id(), nil)
+	var webhookEndpoint *stripe.WebhookEndpoint
+	err := withRateLimiting(func() error {
+		var errLocal error
+		webhookEndpoint, errLocal = c.WebhookEndpoints.Get(d.Id(), nil)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -93,7 +98,13 @@ func resourceStripeWebhookEndpointCreate(ctx context.Context, d *schema.Resource
 		}
 	}
 
-	webhookEndpoint, err := c.WebhookEndpoints.New(params)
+	var webhookEndpoint *stripe.WebhookEndpoint
+	err := withRateLimiting(func() error {
+		var errLocal error
+		webhookEndpoint, errLocal = c.WebhookEndpoints.New(params)
+		return errLocal
+	})
+
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -133,7 +144,12 @@ func resourceStripeWebhookEndpointUpdate(ctx context.Context, d *schema.Resource
 		}
 	}
 
-	_, err := c.WebhookEndpoints.Update(d.Id(), params)
+	err := withRateLimiting(func() error {
+		var errLocal error
+		_, errLocal = c.WebhookEndpoints.Update(d.Id(), params)
+		return errLocal
+	})
+
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -144,7 +160,12 @@ func resourceStripeWebhookEndpointUpdate(ctx context.Context, d *schema.Resource
 func resourceStripeWebhookEndpointDelete(_ context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*client.API)
 
-	_, err := c.WebhookEndpoints.Del(d.Id(), nil)
+	err := withRateLimiting(func() error {
+		var errLocal error
+		_, errLocal = c.WebhookEndpoints.Del(d.Id(), nil)
+		return errLocal
+	})
+
 	if err != nil {
 		return diag.FromErr(err)
 	}

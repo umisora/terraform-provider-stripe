@@ -94,7 +94,13 @@ func resourceStripeProduct() *schema.Resource {
 
 func resourceStripeProductRead(_ context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*client.API)
-	product, err := c.Products.Get(d.Id(), nil)
+
+	var product *stripe.Product
+	err := withRateLimiting(func() error {
+		var errLocal error
+		product, errLocal = c.Products.Get(d.Id(), nil)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -171,7 +177,12 @@ func resourceStripeProductCreate(ctx context.Context, d *schema.ResourceData, m 
 		}
 	}
 
-	product, err := c.Products.New(params)
+	var product *stripe.Product
+	err := withRateLimiting(func() error {
+		var errLocal error
+		product, errLocal = c.Products.New(params)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -236,7 +247,11 @@ func resourceStripeProductUpdate(ctx context.Context, d *schema.ResourceData, m 
 		}
 	}
 
-	_, err := c.Products.Update(d.Id(), params)
+	err := withRateLimiting(func() error {
+		var errLocal error
+		_, errLocal = c.Products.Update(d.Id(), params)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -246,7 +261,12 @@ func resourceStripeProductUpdate(ctx context.Context, d *schema.ResourceData, m 
 
 func resourceStripeProductDelete(_ context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*client.API)
-	_, err := c.Products.Del(d.Id(), nil)
+
+	err := withRateLimiting(func() error {
+		var errLocal error
+		_, errLocal = c.Products.Del(d.Id(), nil)
+		return errLocal
+	})
 	if err != nil {
 		return diag.FromErr(err)
 	}
