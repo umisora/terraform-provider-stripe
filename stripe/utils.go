@@ -2,10 +2,12 @@ package stripe
 
 import (
 	"context"
+	"math/rand"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"golang.org/x/sync/semaphore"
+	"golang.org/x/time/rate"
 )
 
 func ExtractString(d *schema.ResourceData, key string) string {
@@ -150,14 +152,19 @@ func CallSet(err ...error) (d diag.Diagnostics) {
 	return d
 }
 
-const maxOperations = 10
-
-var limiter = semaphore.NewWeighted(maxOperations)
+// Stripe has an API rate limit of 25 requests/sec for testing and 100 requests/sec for live environments
+var limiter = rate.NewLimiter(20, 20) // with buffer
 
 func withRateLimiting(f func() error) error {
-	if err := limiter.Acquire(context.Background(), 1); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+	defer cancel()
+
+	if err := limiter.Wait(ctx); err != nil {
 		return err
 	}
-	defer limiter.Release(1)
+	// To avoid rate limiting, slightly vary the processing time of each thread.
+	waitTime := time.Duration(rand.Intn(3000)+500) * time.Millisecond
+	time.Sleep(waitTime)
+
 	return f()
 }
